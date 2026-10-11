@@ -84,6 +84,7 @@ export default function RootLayout() {
           <Stack.Screen name="route/[id]" options={{ title: '' }} />
           <Stack.Screen name="run/active" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="run/finish" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="import" options={{ title: 'Import a run' }} />
         </Stack.Protected>
       </Stack>
     </>

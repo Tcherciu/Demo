@@ -1,50 +1,16 @@
-// Strava OAuth token exchange + activity fetch. Runs on Supabase Edge Functions (Deno).
+// Strava: OAuth token exchange, activity history for personal pace estimates, and importing
+// runs (with their full GPS track) as verified course attempts. Garmin, COROS, Polar, Suunto
+// and Apple Watch users who auto-sync to Strava come in through here too.
 // The client secret lives only here; the app never sees Strava tokens.
 //
 // Required secrets: STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET
-// (SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided by the platform.)
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
-const STRAVA_API = 'https://www.strava.com/api/v3';
+import { importTrack } from '../_shared/runService.ts';
+import { accessTokenFor, activityTrack, isRun, stravaGet, tokenRequest, type StravaActivity } from '../_shared/strava.ts';
+
 const LOOKBACK_DAYS = 120;
-const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun']);
-
 const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-
-interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
-  athlete?: { id: number; firstname?: string };
-}
-
-async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const res = await fetch(STRAVA_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: Deno.env.get('STRAVA_CLIENT_ID')!,
-      client_secret: Deno.env.get('STRAVA_CLIENT_SECRET')!,
-      ...params,
-    }),
-  });
-  if (!res.ok) throw new Error(`Strava token request failed (${res.status})`);
-  return res.json();
-}
-
-async function accessTokenFor(userId: string): Promise<string> {
-  const { data, error } = await admin.from('strava_connections').select('*').eq('user_id', userId).single();
-  if (error || !data) throw new Error('Strava not connected');
-  // Refresh a little early so the token can't expire mid-request.
-  if (new Date(data.expires_at).getTime() - 60_000 > Date.now()) return data.access_token;
-  const t = await tokenRequest({ grant_type: 'refresh_token', refresh_token: data.refresh_token });
-  await admin
-    .from('strava_connections')
-    .update({ access_token: t.access_token, refresh_token: t.refresh_token, expires_at: new Date(t.expires_at * 1000).toISOString() })
-    .eq('user_id', userId);
-  return t.access_token;
-}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -64,33 +30,64 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case 'exchange': {
         const t = await tokenRequest({ grant_type: 'authorization_code', code: String(body.code) });
-        await admin.from('strava_connections').upsert({
+        const { error } = await admin.from('strava_connections').upsert({
           user_id: user.id,
           athlete_id: t.athlete!.id,
           access_token: t.access_token,
           refresh_token: t.refresh_token,
           expires_at: new Date(t.expires_at * 1000).toISOString(),
         });
+        if (error) throw error;
         return json({ connected: true, athleteName: t.athlete?.firstname ?? null });
       }
+      case 'status': {
+        const { data } = await admin.from('strava_connections').select('athlete_id').eq('user_id', user.id).maybeSingle();
+        return json({ connected: !!data });
+      }
       case 'activities': {
-        const token = await accessTokenFor(user.id);
+        const token = await accessTokenFor(admin, user.id);
         const after = Math.floor(Date.now() / 1000) - LOOKBACK_DAYS * 86_400;
-        const res = await fetch(`${STRAVA_API}/athlete/activities?per_page=100&after=${after}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Strava activities request failed (${res.status})`);
-        const activities: Array<Record<string, unknown>> = await res.json();
+        const activities = await stravaGet<StravaActivity[]>(token, `/athlete/activities?per_page=100&after=${after}`);
         return json({
-          activities: activities
-            .filter((a) => RUN_TYPES.has(String(a.sport_type ?? a.type)))
+          activities: activities.filter(isRun).map((a) => ({
+            distanceM: a.distance,
+            movingTimeS: a.moving_time,
+            elevationGainM: a.total_elevation_gain ?? 0,
+            startedAt: Date.parse(a.start_date),
+          })),
+        });
+      }
+      case 'recent_runs': {
+        const token = await accessTokenFor(admin, user.id);
+        const activities = await stravaGet<StravaActivity[]>(token, '/athlete/activities?per_page=30');
+        return json({
+          runs: activities
+            .filter((a) => isRun(a) && a.map?.summary_polyline)
             .map((a) => ({
+              id: String(a.id),
+              name: a.name,
+              startedAt: Date.parse(a.start_date),
               distanceM: a.distance,
-              movingTimeS: a.moving_time,
-              elevationGainM: a.total_elevation_gain ?? 0,
-              startedAt: Date.parse(String(a.start_date)),
+              elapsedS: a.elapsed_time,
+              device: a.device_name ?? null,
             })),
         });
+      }
+      case 'import': {
+        const token = await accessTokenFor(admin, user.id);
+        const activity = await stravaGet<StravaActivity>(token, `/activities/${encodeURIComponent(String(body.activityId))}`);
+        if (!isRun(activity)) return json({ ok: false, reason: "That Strava activity isn't a run." });
+        const points = await activityTrack(token, activity);
+        if (points.length === 0) return json({ ok: false, reason: 'That activity has no GPS track.' });
+        return json(
+          await importTrack(admin, user.id, {
+            source: 'strava',
+            externalId: String(activity.id),
+            points,
+            name: activity.name,
+            createRoute: body.createRoute !== false,
+          }),
+        );
       }
       case 'disconnect': {
         await admin.from('strava_connections').delete().eq('user_id', user.id);

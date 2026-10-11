@@ -103,7 +103,18 @@ async function runs<T>(body: Record<string, unknown>): Promise<VerifyResult<T>> 
   return data as VerifyResult<T>;
 }
 
+export interface ImportOutcome {
+  matched: { routeId: string; routeName: string; elapsedS: number; status: 'inserted' | 'upgraded' | 'duplicate' }[];
+  createdRouteId: string | null;
+}
+
+export type ImportSource = 'apple_health' | 'gpx';
+
 export const runsApi = {
+  /** A run recorded on a watch or in another app; matched against every nearby course server-side. */
+  importTrack: (r: { source: ImportSource; externalId: string; points: TrackPoint[]; name?: string }) =>
+    runs<ImportOutcome>({ action: 'import_track', source: r.source, externalId: r.externalId, name: r.name, points: toWire(r.points) }),
+
   submitAttempt: (a: { routeId: string; clientRunId: string; points: TrackPoint[] }) =>
     runs<{ elapsedS: number }>({ action: 'submit_attempt', routeId: a.routeId, clientRunId: a.clientRunId, points: toWire(a.points) }),
   createRoute: (r: { clientRunId: string; points: TrackPoint[]; name?: string }) =>
@@ -168,8 +179,20 @@ async function strava<T>(body: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+export interface StravaRun {
+  id: string;
+  name: string;
+  startedAt: number;
+  distanceM: number;
+  elapsedS: number;
+  device: string | null;
+}
+
 export const stravaApi = {
   exchange: (code: string) => strava<{ connected: boolean; athleteName: string | null }>({ action: 'exchange', code }),
+  status: () => strava<{ connected: boolean }>({ action: 'status' }).then((r) => r.connected),
+  recentRuns: () => strava<{ runs: StravaRun[] }>({ action: 'recent_runs' }).then((r) => r.runs),
+  importActivity: (activityId: string) => strava<VerifyResult<ImportOutcome>>({ action: 'import', activityId }),
   activities: () => strava<{ activities: ActivitySummary[] }>({ action: 'activities' }).then((r) => r.activities),
   disconnect: () => strava<{ connected: boolean }>({ action: 'disconnect' }),
 };

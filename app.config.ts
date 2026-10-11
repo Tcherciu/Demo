@@ -40,6 +40,16 @@ const config: ExpoConfig = {
     ],
     'expo-notifications',
     [
+      '@kingstinct/react-native-healthkit',
+      {
+        NSHealthShareUsageDescription:
+          'PacePath reads your running workouts and their GPS routes (Apple Watch, Garmin and other apps) so they can count on courses.',
+        NSHealthUpdateUsageDescription: false,
+        background: false,
+      },
+    ],
+    'expo-document-picker',
+    [
       'react-native-maps',
       {
         // Android needs a Google Maps key; iOS uses Apple Maps when none is given.
