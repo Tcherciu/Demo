@@ -31,26 +31,31 @@ export default function Finish() {
   const [routeId, setRouteId] = useState<string | null>(run?.route?.id ?? null);
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState(false);
+  const [rejectedReason, setRejectedReason] = useState<string | null>(null);
   const [stars, setStars] = useState(0);
   const [name, setName] = useState('');
 
-  const validAttempt = run?.mode === 'course' && run.status === 'finished';
+  const finishedCourse = run?.mode === 'course' && run.status === 'finished';
+  const validAttempt = finishedCourse && !rejectedReason;
   // Until the upload answers (or if it can't), go by the live distance; afterwards, by whether a route was created.
   const isNewRoute =
     run?.mode === 'free' &&
+    !rejectedReason &&
     (syncing || syncError ? metersToMiles(run.distanceM) >= RULES.minRouteMiles : routeId != null);
 
   useEffect(() => {
     if (!run) return;
     (async () => {
       try {
-        if (validAttempt && run.route) {
-          // Classify against the board *before* this result is uploaded.
-          const [board, me] = await Promise.all([fetchLeaderboard(run.route.id, 1000), currentUserId()]);
-          setOutcome(classifyResult(run.elapsedS!, courseStats(board, me)));
-        }
-        const { createdRouteId } = await syncRunById(run.runId);
-        if (createdRouteId) setRouteId(createdRouteId);
+        // Read the board *before* this result is uploaded, to tell a new record from a repeat.
+        const before =
+          validAttempt && run.route
+            ? await Promise.all([fetchLeaderboard(run.route.id, 1000), currentUserId()]).then(([b, me]) => courseStats(b, me))
+            : null;
+        const res = await syncRunById(run.runId);
+        if (res.createdRouteId) setRouteId(res.createdRouteId);
+        setRejectedReason(res.rejectedReason);
+        if (before && res.verifiedElapsedS != null) setOutcome(classifyResult(res.verifiedElapsedS, before));
         void refreshRoutes();
       } catch {
         setSyncError(true); // stays queued locally; retried on next launch
@@ -79,7 +84,15 @@ export default function Finish() {
 
   return (
     <SafeAreaView style={s.wrap}>
-      <Headline run={run} validAttempt={validAttempt} isNewRoute={isNewRoute} outcome={outcome} syncing={syncing} syncError={syncError} />
+      <Headline
+        run={run}
+        validAttempt={validAttempt}
+        isNewRoute={isNewRoute}
+        outcome={outcome}
+        syncing={syncing}
+        syncError={syncError}
+        rejectedReason={rejectedReason}
+      />
 
       {isNewRoute && (
         <TextInput
@@ -134,15 +147,23 @@ function Headline(props: {
   outcome: RecordOutcome | null;
   syncing: boolean;
   syncError: boolean;
+  rejectedReason: string | null;
 }) {
-  const { run, validAttempt, isNewRoute, outcome, syncing, syncError } = props;
+  const { run, validAttempt, isNewRoute, outcome, syncing, syncError, rejectedReason } = props;
   const time = formatDuration(run.elapsedS ?? 0);
   const mi = metersToMiles(run.distanceM).toFixed(2);
 
   let title: string;
   let sub: string;
-  if (run.mode === 'course' && validAttempt) {
-    title = outcome === 'course_record' ? '🏆 New course record!' : outcome === 'personal_best' ? '🔥 Personal best!' : 'Course complete';
+  if (rejectedReason) {
+    title = run.mode === 'course' ? "This run couldn't be verified" : "This run wasn't saved as a route";
+    sub = `${rejectedReason} Your GPS track is still saved on your phone.`;
+  } else if (run.mode === 'course' && validAttempt) {
+    title =
+      outcome === 'course_record' ? '🏆 New course record!'
+      : outcome === 'personal_best' ? '🔥 Personal best!'
+      : syncing ? 'Course complete — verifying…'
+      : 'Course complete';
     sub = outcome === 'course_record' ? `Everyone running ${run.route!.name} now chases your time.` : run.route!.name;
   } else if (run.mode === 'course') {
     title = "This run didn't count";

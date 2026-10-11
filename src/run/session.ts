@@ -41,6 +41,7 @@ export function toTrackPoint(l: Location.LocationObject): TrackPoint {
     ele: l.coords.altitude,
     acc: l.coords.accuracy,
     t: l.timestamp,
+    mocked: l.mocked === true,
   };
 }
 

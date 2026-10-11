@@ -1,6 +1,6 @@
-import { difficultyLabel, difficultyScore, equivalentFlatFromTotals, gradeFactor, minettiCost, profileRoute } from '../difficulty';
-import { milesToMeters } from '../units';
-import { walk } from './helpers';
+import { difficultyLabel, difficultyScore, equivalentFlatFromTotals, gradeFactor, minettiCost, profileRoute } from '../difficulty.ts';
+import { milesToMeters } from '../units.ts';
+import { walk } from './helpers.ts';
 
 describe('difficulty', () => {
   it('Minetti cost is 3.6 J/kg/m on the flat and rises uphill', () => {

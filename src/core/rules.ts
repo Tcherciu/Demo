@@ -1,4 +1,4 @@
-import { feetToMeters, milesToMeters } from './units';
+import { feetToMeters, milesToMeters } from './units.ts';
 
 /**
  * Product rules, in one place so the app, the tracker and the tests agree.

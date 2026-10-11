@@ -11,4 +11,9 @@ module.exports = defineConfig([
     // React Native <Text> renders apostrophes literally; this rule is for HTML.
     rules: { 'react/no-unescaped-entities': 'off' },
   },
+  {
+    // Node scripts read their own environment at runtime, not Expo's inlined EXPO_PUBLIC_* vars.
+    files: ['scripts/**'],
+    rules: { 'expo/no-dynamic-env-var': 'off' },
+  },
 ]);

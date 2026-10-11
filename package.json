@@ -43,7 +43,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:core": "node scripts/sync-shared-core.ts",
+    "import:gpx": "node scripts/import-gpx.ts"
   },
   "private": true,
   "jest": {

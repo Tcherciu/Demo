@@ -1,6 +1,6 @@
-import { CourseTracker, type TrackerEvent } from '../courseTracker';
-import type { TrackPoint } from '../geo';
-import { offset, timed, walk } from './helpers';
+import { CourseTracker, type TrackerEvent } from '../courseTracker.ts';
+import type { TrackPoint } from '../geo.ts';
+import { offset, timed, walk } from './helpers.ts';
 
 // A 1.6 km square loop, counter-clockwise from the origin.
 const SQUARE: [number, number][] = [[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]];

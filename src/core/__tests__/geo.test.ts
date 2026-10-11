@@ -1,5 +1,5 @@
-import { cumulativeDistances, haversine, nearestOnCourse, pathLength, simplify } from '../geo';
-import { offset, walk } from './helpers';
+import { cumulativeDistances, haversine, nearestOnCourse, pathLength, simplify } from '../geo.ts';
+import { offset, walk } from './helpers.ts';
 
 describe('geo', () => {
   it('haversine matches local offsets', () => {

@@ -25,6 +25,8 @@ export interface LocalRun {
   created_route_id: string | null;
   /** 0 = waiting to upload. */
   synced: number;
+  /** Why the server refused this run (off course, implausible GPS, ...). Null if accepted. */
+  rejected_reason: string | null;
 }
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -63,9 +65,26 @@ export function db(): Promise<SQLite.SQLiteDatabase> {
         updated_at INTEGER NOT NULL
       );
     `);
+    await migrate(d);
     return d;
   })();
   return dbPromise;
+}
+
+/** Schema changes for databases created by earlier app versions, tracked with PRAGMA user_version. */
+const MIGRATIONS: string[] = [
+  `ALTER TABLE runs ADD COLUMN rejected_reason TEXT;
+   ALTER TABLE run_points ADD COLUMN mocked INTEGER NOT NULL DEFAULT 0;`,
+];
+
+async function migrate(d: SQLite.SQLiteDatabase) {
+  const row = await d.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  for (let v = row?.user_version ?? 0; v < MIGRATIONS.length; v++) {
+    await d.withTransactionAsync(async () => {
+      await d.execAsync(MIGRATIONS[v]);
+      await d.execAsync(`PRAGMA user_version = ${v + 1}`);
+    });
+  }
 }
 
 export async function insertRun(run: Pick<LocalRun, 'id' | 'mode' | 'route_id' | 'started_at'>) {
@@ -82,8 +101,8 @@ export async function appendPoints(runId: string, points: readonly TrackPoint[])
   await d.withTransactionAsync(async () => {
     for (const p of points) {
       await d.runAsync(
-        'INSERT OR IGNORE INTO run_points (run_id, t, lat, lng, ele, acc) VALUES (?, ?, ?, ?, ?, ?)',
-        runId, p.t ?? Date.now(), p.lat, p.lng, p.ele ?? null, p.acc ?? null,
+        'INSERT OR IGNORE INTO run_points (run_id, t, lat, lng, ele, acc, mocked) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        runId, p.t ?? Date.now(), p.lat, p.lng, p.ele ?? null, p.acc ?? null, p.mocked ? 1 : 0,
       );
     }
   });
@@ -108,10 +127,10 @@ export async function getActiveRun(): Promise<LocalRun | null> {
 }
 
 export async function getRunPoints(runId: string): Promise<TrackPoint[]> {
-  const rows = await (await db()).getAllAsync<{ t: number; lat: number; lng: number; ele: number | null; acc: number | null }>(
-    'SELECT t, lat, lng, ele, acc FROM run_points WHERE run_id = ? ORDER BY t', runId,
+  const rows = await (await db()).getAllAsync<{ t: number; lat: number; lng: number; ele: number | null; acc: number | null; mocked: number }>(
+    'SELECT t, lat, lng, ele, acc, mocked FROM run_points WHERE run_id = ? ORDER BY t', runId,
   );
-  return rows.map((r) => ({ lat: r.lat, lng: r.lng, ele: r.ele, acc: r.acc, t: r.t }));
+  return rows.map((r) => ({ lat: r.lat, lng: r.lng, ele: r.ele, acc: r.acc, t: r.t, mocked: r.mocked === 1 }));
 }
 
 export async function unsyncedRuns(): Promise<LocalRun[]> {

@@ -1,6 +1,7 @@
 import type { ActivitySummary, PaceModel } from '../core/estimates';
 import type { RouteSummary } from '../core/filters';
 import type { TrackPoint } from '../core/geo';
+import { toWire } from '../core/verify';
 import { supabase } from './supabase';
 
 export interface RouteDetail extends RouteSummary {
@@ -88,43 +89,26 @@ export async function fetchLeaderboard(routeId: string, limit = 20): Promise<Lea
   }));
 }
 
-/** Idempotent: re-submitting the same local run id is a no-op. */
-export async function submitAttempt(a: { routeId: string; elapsedS: number; pauseCount: number; clientRunId: string; finishedAt: number }) {
-  const userId = await currentUserId();
-  check(
-    await supabase.from('attempts').upsert(
-      {
-        route_id: a.routeId,
-        user_id: userId,
-        elapsed_s: a.elapsedS,
-        pause_count: a.pauseCount,
-        client_run_id: a.clientRunId,
-        finished_at: new Date(a.finishedAt).toISOString(),
-      },
-      { onConflict: 'user_id,client_run_id', ignoreDuplicates: true },
-    ),
-  );
+export type VerifyResult<T> = ({ ok: true } & T) | { ok: false; reason: string };
+
+/**
+ * Results go through the `runs` edge function, which replays the GPS track through the
+ * same rules and computes times/metrics itself. `ok: false` means the server rejected the
+ * run (don't retry); a thrown error means it couldn't be reached (retry later).
+ * Both calls are idempotent per local run id.
+ */
+async function runs<T>(body: Record<string, unknown>): Promise<VerifyResult<T>> {
+  const { data, error } = await supabase.functions.invoke('runs', { body });
+  if (error) throw new Error(error.message);
+  return data as VerifyResult<T>;
 }
 
-export async function createRouteFromRun(r: {
-  name: string; distanceM: number; elevationGainM: number; equivalentFlatM: number;
-  difficulty: number; path: TrackPoint[]; elapsedS: number; clientRunId: string;
-}): Promise<string> {
-  return check(
-    await supabase.rpc('create_route_from_run', {
-      p_name: r.name,
-      p_distance_m: r.distanceM,
-      p_elevation_gain_m: r.elevationGainM,
-      p_equivalent_flat_m: r.equivalentFlatM,
-      p_difficulty: r.difficulty,
-      p_path: r.path.map((p) => [round6(p.lat), round6(p.lng), p.ele == null ? null : Math.round(p.ele)]),
-      p_elapsed_s: r.elapsedS,
-      p_client_run_id: r.clientRunId,
-    }),
-  ) as string;
-}
-
-const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+export const runsApi = {
+  submitAttempt: (a: { routeId: string; clientRunId: string; points: TrackPoint[] }) =>
+    runs<{ elapsedS: number }>({ action: 'submit_attempt', routeId: a.routeId, clientRunId: a.clientRunId, points: toWire(a.points) }),
+  createRoute: (r: { clientRunId: string; points: TrackPoint[]; name?: string }) =>
+    runs<{ routeId: string }>({ action: 'create_route', clientRunId: r.clientRunId, name: r.name, points: toWire(r.points) }),
+};
 
 export async function renameRoute(id: string, name: string) {
   check(await supabase.from('routes').update({ name }).eq('id', id));

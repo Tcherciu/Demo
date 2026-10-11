@@ -1,5 +1,5 @@
-import { equivalentFlatFromTotals } from './difficulty';
-import { metersToMiles } from './units';
+import { equivalentFlatFromTotals } from './difficulty.ts';
+import { metersToMiles } from './units.ts';
 
 export type SkillTier = 'beginner' | 'intermediate' | 'advanced';
 

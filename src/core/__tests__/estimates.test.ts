@@ -1,5 +1,5 @@
-import { estimateAllTiers, nearestTier, personalPaceModel, TIER_MODELS } from '../estimates';
-import { milesToMeters } from '../units';
+import { estimateAllTiers, nearestTier, personalPaceModel, TIER_MODELS } from '../estimates.ts';
+import { milesToMeters } from '../units.ts';
 
 const DAY = 86_400_000;
 const NOW = 1_800_000_000_000;

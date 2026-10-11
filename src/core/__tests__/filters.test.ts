@@ -1,6 +1,6 @@
-import { applyFilter, bayesianRating, type RouteSummary } from '../filters';
-import { milesToMeters } from '../units';
-import { offset } from './helpers';
+import { applyFilter, bayesianRating, type RouteSummary } from '../filters.ts';
+import { milesToMeters } from '../units.ts';
+import { offset } from './helpers.ts';
 
 const route = (id: string, over: Partial<RouteSummary>): RouteSummary => ({
   id, name: id, creatorId: 'u', distanceM: milesToMeters(5), elevationGainM: 0, equivalentFlatM: milesToMeters(5),

@@ -1,5 +1,5 @@
-import { haversine, type TrackPoint } from './geo';
-import { metersToFeet, metersToMiles } from './units';
+import { haversine, type TrackPoint } from './geo.ts';
+import { metersToFeet, metersToMiles } from './units.ts';
 
 /**
  * Grade-adjusted effort, built on Minetti et al. (2002), "Energy cost of walking and

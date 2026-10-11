@@ -10,6 +10,8 @@ export interface TrackPoint extends LatLng {
   t?: number;
   /** Horizontal accuracy radius in meters, as reported by the device. */
   acc?: number | null;
+  /** The OS reported this fix as coming from a mock-location provider (Android). */
+  mocked?: boolean;
 }
 
 const EARTH_RADIUS_M = 6_371_008.8;

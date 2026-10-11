@@ -1,6 +1,6 @@
-import { haversine, type LatLng } from './geo';
-import type { SkillTier } from './estimates';
-import { metersToMiles } from './units';
+import { haversine, type LatLng } from './geo.ts';
+import type { SkillTier } from './estimates.ts';
+import { metersToMiles } from './units.ts';
 
 export interface RouteSummary {
   id: string;

@@ -1,4 +1,4 @@
-import type { LatLng, TrackPoint } from '../geo';
+import type { LatLng, TrackPoint } from '../geo.ts';
 
 export const BASE: LatLng = { lat: 40.0, lng: -105.0 };
 const M_PER_DEG_LAT = 111_132.954;

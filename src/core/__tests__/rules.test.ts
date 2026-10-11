@@ -1,5 +1,5 @@
-import { isLongEnoughToSave, isRoutePublic, publicProgressLabel } from '../rules';
-import { milesToMeters } from '../units';
+import { isLongEnoughToSave, isRoutePublic, publicProgressLabel } from '../rules.ts';
+import { milesToMeters } from '../units.ts';
 
 describe('rules', () => {
   it('saves runs of 3 miles or more', () => {

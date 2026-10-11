@@ -1,4 +1,4 @@
-import { classifyResult, courseStats } from '../records';
+import { classifyResult, courseStats } from '../records.ts';
 
 describe('records', () => {
   const attempts = [

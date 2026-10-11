@@ -1,5 +1,5 @@
-import { cumulativeDistances, haversine, nearestOnCourse, type LatLng, type TrackPoint } from './geo';
-import { FINISH_RADIUS_M, MAX_DEVIATION_M, REJOIN_RADIUS_M, RULES, START_RADIUS_M } from './rules';
+import { cumulativeDistances, haversine, nearestOnCourse, type LatLng, type TrackPoint } from './geo.ts';
+import { FINISH_RADIUS_M, MAX_DEVIATION_M, REJOIN_RADIUS_M, RULES, START_RADIUS_M } from './rules.ts';
 
 export type TrackerPhase = 'awaiting_start' | 'running' | 'paused_off_course' | 'finished' | 'abandoned';
 
@@ -57,8 +57,10 @@ export class CourseTracker {
   private distanceToCourseM: number | null = null;
   private pauseCount = 0;
   private last: TrackPoint | null = null;
+  private readonly course: readonly LatLng[];
 
-  constructor(private readonly course: readonly LatLng[]) {
+  constructor(course: readonly LatLng[]) {
+    this.course = course;
     if (course.length < 2) throw new Error('A course needs at least two points');
     this.cumulative = cumulativeDistances(course);
     this.lengthM = this.cumulative[this.cumulative.length - 1];
