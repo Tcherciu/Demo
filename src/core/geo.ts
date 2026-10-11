@@ -126,7 +126,7 @@ export function simplify<T extends LatLng>(points: readonly T[], toleranceM: num
   const keep = new Uint8Array(points.length);
   keep[0] = 1;
   keep[points.length - 1] = 1;
-  const stack: Array<[number, number]> = [[0, points.length - 1]];
+  const stack: [number, number][] = [[0, points.length - 1]];
   while (stack.length) {
     const [first, last] = stack.pop()!;
     let maxDist = 0;

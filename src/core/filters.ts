@@ -30,8 +30,9 @@ export interface RouteFilter {
   minDifficulty?: number;
   maxDifficulty?: number;
   minRating?: number;
-  /** Only routes whose start is within this many miles of `near`. */
-  withinMiles?: number;
+  /** Only routes starting inside this circle (the metro area the library covers). */
+  area?: { center: LatLng; radiusMiles: number };
+  /** The runner's position, for "nearest" sorting. */
   near?: LatLng;
   savedOnly?: boolean;
   savedIds?: ReadonlySet<string>;
@@ -56,7 +57,7 @@ export function applyFilter(routes: readonly RouteSummary[], f: RouteFilter): Ro
     if (f.maxDifficulty != null && r.difficulty > f.maxDifficulty) return false;
     if (f.minRating != null && (r.avgRating ?? 0) < f.minRating) return false;
     if (f.savedOnly && !f.savedIds?.has(r.id)) return false;
-    if (f.withinMiles != null && f.near && metersToMiles(haversine(f.near, r.start)) > f.withinMiles) return false;
+    if (f.area && metersToMiles(haversine(f.area.center, r.start)) > f.area.radiusMiles) return false;
     return true;
   });
 

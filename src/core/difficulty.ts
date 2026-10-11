@@ -123,7 +123,7 @@ export function difficultyLabel(score: number): DifficultyLabel {
 }
 
 /** Feet of climbing per mile — shown alongside the score so "hilly" is visible at a glance. */
-export function climbDensityFtPerMile(p: RouteProfile): number {
+export function climbDensityFtPerMile(p: Pick<RouteProfile, 'distanceM' | 'elevationGainM'>): number {
   const mi = metersToMiles(p.distanceM);
   return mi > 0 ? metersToFeet(p.elevationGainM) / mi : 0;
 }

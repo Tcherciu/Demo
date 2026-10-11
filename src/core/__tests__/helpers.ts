@@ -12,7 +12,7 @@ export function offset(dx: number, dy: number, base: LatLng = BASE): LatLng {
 }
 
 /** Densifies a polyline given in local meters into points every `stepM` meters. */
-export function walk(cornersM: Array<[number, number]>, stepM = 5): LatLng[] {
+export function walk(cornersM: [number, number][], stepM = 5): LatLng[] {
   const out: LatLng[] = [offset(...cornersM[0])];
   for (let i = 1; i < cornersM.length; i++) {
     const [x0, y0] = cornersM[i - 1];

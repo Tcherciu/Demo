@@ -3,7 +3,7 @@ import type { TrackPoint } from '../geo';
 import { offset, timed, walk } from './helpers';
 
 // A 1.6 km square loop, counter-clockwise from the origin.
-const SQUARE: Array<[number, number]> = [[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]];
+const SQUARE: [number, number][] = [[0, 0], [400, 0], [400, 400], [0, 400], [0, 0]];
 const course = walk(SQUARE, 20);
 
 function run(tracker: CourseTracker, pts: TrackPoint[]): TrackerEvent[] {
