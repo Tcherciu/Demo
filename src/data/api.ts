@@ -196,3 +196,51 @@ export const stravaApi = {
   activities: () => strava<{ activities: ActivitySummary[] }>({ action: 'activities' }).then((r) => r.activities),
   disconnect: () => strava<{ connected: boolean }>({ action: 'disconnect' }),
 };
+
+export async function savePushToken(token: string, platform: 'ios' | 'android') {
+  const userId = await currentUserId();
+  if (!userId) return;
+  check(await supabase.from('push_tokens').upsert({ token, user_id: userId, platform, updated_at: new Date().toISOString() }));
+}
+
+export async function removePushToken(token: string) {
+  check(await supabase.from('push_tokens').delete().eq('token', token));
+}
+
+export interface RecordBeatenNotice {
+  id: string;
+  routeId: string | null;
+  routeName: string;
+  byName: string;
+  newS: number;
+  oldS: number;
+  createdAt: number;
+  read: boolean;
+}
+
+export async function fetchNotifications(limit = 20): Promise<RecordBeatenNotice[]> {
+  const rows = check(
+    await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(limit),
+  ) as { id: string; route_id: string | null; data: Record<string, unknown>; created_at: string; read_at: string | null }[];
+  return rows.map((r) => ({
+    id: r.id,
+    routeId: r.route_id,
+    routeName: String(r.data.routeName ?? 'a course'),
+    byName: String(r.data.byName ?? 'Someone'),
+    newS: Number(r.data.newS ?? 0),
+    oldS: Number(r.data.oldS ?? 0),
+    createdAt: Date.parse(r.created_at),
+    read: r.read_at != null,
+  }));
+}
+
+export async function markNotificationsRead(ids: string[]) {
+  if (ids.length === 0) return;
+  check(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids));
+}
+
+/** Permanently deletes the signed-in account on the server. */
+export async function deleteAccount() {
+  const { error } = await supabase.functions.invoke('account', { body: { action: 'delete', confirm: 'DELETE' } });
+  if (error) throw new Error(error.message);
+}

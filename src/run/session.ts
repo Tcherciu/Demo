@@ -8,8 +8,9 @@ import { RULES } from '../core/rules';
 import { cacheRoute, cachedRoute, getActiveRun, getRunPoints, insertRun, appendPoints, updateRun, type RunMode } from '../data/localDb';
 import type { RouteDetail } from '../data/api';
 import { createStore } from '../data/store';
+import { registerPushToken } from '../notifications/push';
 
-export const LOCATION_TASK = 'pacepath-run-location';
+export const LOCATION_TASK = 'loopd-run-location';
 
 export interface ActiveRun {
   runId: string;
@@ -51,6 +52,8 @@ export async function ensurePermissions(): Promise<string | null> {
   const bg = await Location.requestBackgroundPermissionsAsync();
   if (bg.status !== 'granted') return 'Allow location "Always" so your run keeps recording with the screen off.';
   await Notifications.requestPermissionsAsync();
+  // Same permission covers "your record was beaten" pushes.
+  void registerPushToken();
   return null;
 }
 
@@ -64,7 +67,7 @@ async function startUpdates() {
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: 'PacePath is recording your run',
+      notificationTitle: 'loopd is recording your run',
       notificationBody: 'Tap to return to your run.',
       killServiceOnDestroy: false,
     },
@@ -159,7 +162,7 @@ async function handleEvent(e: TrackerEvent) {
       break;
     case 'finished':
       await finishRun(e.elapsedS, e.at);
-      await notify('Course complete!', 'Open PacePath to see how you did.');
+      await notify('Course complete!', 'Open loopd to see how you did.');
       break;
   }
 }
@@ -202,6 +205,13 @@ export async function stopRun(): Promise<void> {
 export async function resumeActiveRun(): Promise<void> {
   if (!activeRun.get()) await rehydrate();
   if (activeRun.get()?.status === 'recording') await startUpdates();
+}
+
+/** Stops any run in progress without saving it as finished (used when deleting the account). */
+export async function discardActiveRun(): Promise<void> {
+  await stopUpdates();
+  activeRun.set(null);
+  tracker = null;
 }
 
 export function clearFinishedRun() {

@@ -10,6 +10,7 @@ import { Text, View } from 'react-native';
 import { isBackendConfigured } from '../config';
 import { supabase } from '../data/supabase';
 import { profileStore, refreshProfile, tierStore } from '../hooks/useAppData';
+import { registerPushToken, useNotificationTaps } from '../notifications/push';
 import { resumeActiveRun } from '../run/session';
 import { syncPending } from '../run/sync';
 import { colors } from '../ui/theme';
@@ -52,9 +53,11 @@ export default function RootLayout() {
       .catch((e) => console.warn('profile load failed', e))
       .finally(() => setLoadedFor(userId));
     void syncPending();
+    void registerPushToken();
   }, [session?.user.id]);
 
   const profileLoaded = session === null || (!!session && loadedFor === session.user.id);
+  useNotificationTaps(!!session && !!profile);
 
   if (!isBackendConfigured) {
     return (

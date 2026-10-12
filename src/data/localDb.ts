@@ -33,7 +33,7 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export function db(): Promise<SQLite.SQLiteDatabase> {
   dbPromise ??= (async () => {
-    const d = await SQLite.openDatabaseAsync('pacepath.db');
+    const d = await SQLite.openDatabaseAsync('loopd.db');
     await d.execAsync(`
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS runs (
@@ -152,4 +152,10 @@ export async function cacheRoute(id: string, value: unknown) {
 export async function cachedRoute<T>(id: string): Promise<T | null> {
   const row = await (await db()).getFirstAsync<{ json: string }>('SELECT json FROM route_cache WHERE id = ?', id);
   return row ? (JSON.parse(row.json) as T) : null;
+}
+
+/** Removes every run, GPS fix and cached route from this device (account deletion). */
+export async function wipeLocalData() {
+  const d = await db();
+  await d.execAsync('DELETE FROM run_points; DELETE FROM runs; DELETE FROM route_cache;');
 }

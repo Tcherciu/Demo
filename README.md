@@ -1,4 +1,6 @@
-# PacePath
+<img src="assets/icon.png" width="96" alt="loopd logo: an orange route loop with a runner at its center">
+
+# loopd
 
 A running-route library for one metro area, built by its runners. Browse and filter loops,
 see a real difficulty score and time estimates for your level, then race the course
@@ -72,10 +74,26 @@ and also by the watch, it's counted once, and the watch's track replaces the pho
 
 **Garmin directly:** Garmin's Activity API is only available to companies approved for the
 Garmin Connect Developer Program, and it delivers data by webhook to a business backend. Until
-PacePath is approved, Garmin runs come in through Apple Health or Strava sync, which Garmin
+loopd is approved, Garmin runs come in through Apple Health or Strava sync, which Garmin
 Connect supports natively. Once approved, a direct integration would be another webhook source
 for the same `importTrack` pipeline. Only the code that fetches and parses Garmin's data would be
 new.
+
+### Record alerts
+
+When someone beats your course record, you get a push notification ("Your record on Riverside
+Loop fell: Dana ran 21:10, beating your 21:48"). It also appears under **Your records** on the
+You tab, and tapping either one opens the route. The server sends it as soon as it verifies the
+new time, whether that time came from the app, a watch or Strava. The app asks for notification
+permission at the first run, not at launch, and sign-out stops the device getting your alerts.
+
+### Account deletion
+
+You tab → **Delete account**, with a confirmation step. This is required by the App Store for
+apps with sign-up. It permanently deletes the profile, run history, times and records, ratings,
+saved routes, private routes, notifications and push tokens, and revokes the Strava connection.
+It also wipes the phone's local GPS storage. Public routes the runner created stay for other
+runners, with no name attached.
 
 ### Difficulty score
 
@@ -139,10 +157,12 @@ supabase/
     runs/            verified uploads: course attempts, new routes, imported tracks
     strava/          OAuth, pace history, importing Strava runs
     strava-webhook/  automatic import when a runner uploads to Strava
-    _shared/         run service, Strava helpers, and a copy of src/core (`npm run sync:core`)
+    account/         account deletion
+    _shared/         run service, Strava and push helpers, and a copy of src/core (`npm run sync:core`)
 scripts/
   import-gpx.ts      load curated library routes from GPX files
   sync-shared-core.ts
+  render-brand.cjs   regenerate the app icons from assets/brand/mark.svg (`npm run render:brand`)
 ```
 
 ## Setup
@@ -150,8 +170,8 @@ scripts/
 1. **Install:** `npm install`
 2. **Supabase:** create a project, then `supabase link` and `supabase db push`. This applies
    `supabase/migrations`. Enable Email sign-in (OTP code) under Auth.
-3. **Edge functions:** `supabase functions deploy runs`. This one is required, because all results
-   go through it. Optionally set `ELEVATION_API_URL` if you run your own Open-Meteo instance; the
+3. **Edge functions:** `supabase functions deploy runs` and `supabase functions deploy account`.
+   Both are required: all results go through `runs`, and `account` handles account deletion. Optionally set `ELEVATION_API_URL` if you run your own Open-Meteo instance; the
    public API is for non-commercial use.
 4. **Strava (optional):** create an app at <https://www.strava.com/settings/api> and set its
    Authorization Callback Domain to `localhost`. Then:
@@ -171,10 +191,14 @@ scripts/
    npm run import:gpx -- --dry-run loops/*.gpx   # check distance, climb and difficulty
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import:gpx -- loops/*.gpx
    ```
-6. **Env:** `cp .env.example .env` and fill in your Supabase URL and anon key, your Strava
+6. **Push notifications:** run `npx eas-cli@latest init` to create the EAS project, and set
+   `EAS_PROJECT_ID` in `.env`. Upload your APNs key and FCM credentials with
+   `npx eas-cli@latest credentials`. Optionally run `supabase secrets set EXPO_ACCESS_TOKEN=...` if you
+   turn on enhanced push security in Expo.
+7. **Env:** `cp .env.example .env` and fill in your Supabase URL and anon key, your Strava
    client ID, and the metro area's name, center and radius.
    For Android maps, also set `GOOGLE_MAPS_ANDROID_API_KEY`.
-7. **Run:** the app uses background location, maps and HealthKit, so it needs a development build rather
+8. **Run:** the app uses background location, maps and HealthKit, so it needs a development build rather
    than Expo Go: `npx expo run:ios` / `npx expo run:android`, or
    `npx eas-cli@latest build --profile development`.
 
@@ -190,7 +214,7 @@ npm run sync:core  # after changing src/core
 ## Known gaps / next steps
 
 - **Live tracking still uses the phone.** Watch runs are imported after the fact, so the live
-  start gate and off-course warnings need the phone running PacePath. A watchOS / Garmin Connect IQ
+  start gate and off-course warnings need the phone running loopd. A watchOS / Garmin Connect IQ
   companion app could bring the warnings to the wrist.
 - **Garmin direct API** needs Garmin Connect Developer Program approval (see above).
 - **Android Health Connect** isn't integrated yet. On Android, watch runs come in through Strava or

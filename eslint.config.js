@@ -14,6 +14,7 @@ module.exports = defineConfig([
   {
     // Node scripts read their own environment at runtime, not Expo's inlined EXPO_PUBLIC_* vars.
     files: ['scripts/**'],
+    languageOptions: { globals: { __dirname: 'readonly', require: 'readonly', process: 'readonly' } },
     rules: { 'expo/no-dynamic-env-var': 'off' },
   },
 ]);

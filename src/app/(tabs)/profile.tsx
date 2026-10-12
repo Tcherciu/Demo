@@ -7,8 +7,19 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { config } from '../../config';
 import { personalPaceModel, TIER_MODELS, type SkillTier } from '../../core/estimates';
 import { publicProgressLabel } from '../../core/rules';
-import { formatPace, metersToMiles } from '../../core/units';
-import { runsApi, saveProfile, stravaApi } from '../../data/api';
+import { formatDuration, formatPace, metersToMiles } from '../../core/units';
+import {
+  deleteAccount,
+  fetchNotifications,
+  markNotificationsRead,
+  runsApi,
+  saveProfile,
+  stravaApi,
+  type RecordBeatenNotice,
+} from '../../data/api';
+import { wipeLocalData } from '../../data/localDb';
+import { unregisterPushToken } from '../../notifications/push';
+import { discardActiveRun } from '../../run/session';
 import { supabase } from '../../data/supabase';
 import { profileStore, refreshProfile, refreshRoutes, tierStore, useRoutes } from '../../hooks/useAppData';
 import { appleHealthAvailable, connectAppleHealth } from '../../integrations/appleHealth';
@@ -43,6 +54,8 @@ export default function ProfileTab() {
   const { routes } = useRoutes();
   const [busy, setBusy] = useState(false);
   const [stravaConnected, setStravaConnected] = useState<boolean | null>(null);
+  const [notices, setNotices] = useState<RecordBeatenNotice[]>([]);
+  const [deleting, setDeleting] = useState(false);
   const myRoutes = useMemo(() => routes.filter((r) => r.creatorId === profile?.id), [routes, profile?.id]);
 
   // Strava requires its scopes comma-separated, so pass them as one string.
@@ -51,7 +64,7 @@ export default function ProfileTab() {
       clientId: config.stravaClientId,
       // activity:read_all so runs marked "Only you" on Strava can be imported too.
       scopes: ['read,activity:read_all'],
-      redirectUri: AuthSession.makeRedirectUri({ scheme: 'pacepath', path: 'localhost' }),
+      redirectUri: AuthSession.makeRedirectUri({ scheme: 'loopd', path: 'localhost' }),
       usePKCE: false,
       extraParams: { approval_prompt: 'auto' },
     },
@@ -81,6 +94,56 @@ export default function ProfileTab() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchNotifications()
+      .then((n) => {
+        if (cancelled) return;
+        setNotices(n);
+        void markNotificationsRead(n.filter((x) => !x.read).map((x) => x.id)).catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function signOut() {
+    await unregisterPushToken();
+    await supabase.auth.signOut();
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      'Delete your account?',
+      'This permanently deletes your profile, run history, times and records, ratings, saved routes and ' +
+        'private routes, and disconnects Strava. Public routes you created stay for other runners, without your name. ' +
+        "This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete account', style: 'destructive', onPress: () => void doDelete() },
+      ],
+    );
+  }
+
+  async function doDelete() {
+    setDeleting(true);
+    try {
+      await discardActiveRun();
+      await unregisterPushToken();
+      await deleteAccount();
+      await wipeLocalData();
+      try {
+        for (const key of ['tier', 'importedRuns']) localStorage.removeItem(key);
+      } catch {}
+      // The server session is gone; clear it locally too.
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      setDeleting(false);
+      Alert.alert("Couldn't delete your account", `${(e as Error).message}\n\nCheck your connection and try again.`);
+    }
+  }
 
   async function importGpx() {
     try {
@@ -233,6 +296,26 @@ export default function ProfileTab() {
         </View>
       </Card>
 
+      {notices.length > 0 && (
+        <>
+          <SectionTitle>Your records</SectionTitle>
+          {notices.map((n) => (
+            <Pressable
+              key={n.id}
+              style={[s.routeRow, !n.read && s.unread]}
+              disabled={!n.routeId}
+              onPress={() => n.routeId && router.push({ pathname: '/route/[id]', params: { id: n.routeId } })}
+            >
+              <Text style={{ fontWeight: '700', color: colors.text }}>Your record on {n.routeName} fell</Text>
+              <Text style={s.muted}>
+                {n.byName} ran {formatDuration(n.newS)} (yours was {formatDuration(n.oldS)}) ·{' '}
+                {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      )}
+
       <SectionTitle>Your routes</SectionTitle>
       {myRoutes.length === 0 && <Text style={s.muted}>Finish a 3+ mile free run to create one.</Text>}
       {myRoutes.map((r) => (
@@ -247,7 +330,15 @@ export default function ProfileTab() {
         </Link>
       ))}
 
-      <Button title="Sign out" variant="secondary" style={{ marginTop: space.xl }} onPress={() => supabase.auth.signOut()} />
+      <Button title="Sign out" variant="secondary" style={{ marginTop: space.xl }} onPress={signOut} />
+      <Button
+        title="Delete account"
+        variant="secondary"
+        style={{ marginTop: space.sm, borderColor: colors.bad }}
+        onPress={confirmDelete}
+        loading={deleting}
+      />
+      <Text style={[s.muted, { textAlign: 'center', marginTop: space.xs }]}>Permanently deletes your account and data.</Text>
     </ScrollView>
   );
 }
@@ -259,5 +350,6 @@ const s = StyleSheet.create({
   muted: { color: colors.muted, marginTop: 2 },
   device: { marginTop: space.lg, paddingTop: space.md, borderTopWidth: 1, borderColor: colors.border },
   deviceName: { fontWeight: '800', fontSize: 15, color: colors.text, marginBottom: 2 },
+  unread: { borderColor: colors.primary },
   routeRow: { backgroundColor: colors.card, borderRadius: 12, padding: space.md, marginBottom: space.sm, borderWidth: 1, borderColor: colors.border },
 });

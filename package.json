@@ -1,5 +1,5 @@
 {
-  "name": "pacepath",
+  "name": "loopd",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
@@ -19,6 +19,7 @@
     "expo-location": "~57.0.20",
     "expo-notifications": "~57.0.22",
     "expo-router": "~57.0.25",
+    "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-task-manager": "~57.0.21",
@@ -49,7 +50,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "sync:core": "node scripts/sync-shared-core.ts",
-    "import:gpx": "node scripts/import-gpx.ts"
+    "import:gpx": "node scripts/import-gpx.ts",
+    "render:brand": "node scripts/render-brand.cjs"
   },
   "private": true,
   "jest": {

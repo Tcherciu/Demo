@@ -1,15 +1,17 @@
 export const colors = {
-  bg: '#F6F7F9',
+  bg: '#F4F6F3',
   card: '#FFFFFF',
-  text: '#14171C',
+  text: '#13201A',
   muted: '#667085',
   border: '#E4E7EC',
-  primary: '#FC5200',
+  primary: '#F0571B',
   primaryText: '#FFFFFF',
   good: '#12B76A',
   warn: '#F79009',
   bad: '#D92D20',
   gold: '#EAAA08',
+  /** Brand ground, from the app icon. */
+  brandDark: '#0F1C17',
 };
 
 export const difficultyColor = (score: number) =>

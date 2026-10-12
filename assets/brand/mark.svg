@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- loopd mark: a route loop, clockwise from the start point at the top, with a runner at its center.
+       The gap just before the start is the lap about to close. -->
+  <defs>
+    <linearGradient id="loop" x1="0.15" y1="0.1" x2="0.85" y2="0.95">
+      <stop offset="0" stop-color="#FFB12A"/>
+      <stop offset="0.55" stop-color="#FF6A1F"/>
+      <stop offset="1" stop-color="#F0422A"/>
+    </linearGradient>
+  </defs>
+  <g id="mark">
+    <path d="M512 168 C 742 158 878 300 866 512 C 856 718 712 864 506 860 C 300 856 156 724 160 512 C 164 304 298 176 512 168 Z"
+          pathLength="100" stroke-dasharray="88 12" stroke-dashoffset="-3"
+          fill="none" stroke="url(#loop)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="512" cy="168" r="58" fill="#F6F1E7"/>
+    <circle cx="512" cy="168" r="30" fill="#FF6A1F"/>
+    <g fill="none" stroke="#F6F1E7" stroke-width="54" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M528 404 L 488 566"/>
+      <path d="M522 428 L 592 494 L 652 456"/>
+      <path d="M522 428 L 452 486 L 398 452"/>
+      <path d="M488 566 L 590 614 L 566 712"/>
+      <path d="M488 566 L 438 656 L 352 688"/>
+    </g>
+    <circle cx="552" cy="332" r="50" fill="#F6F1E7"/>
+  </g>
+</svg>

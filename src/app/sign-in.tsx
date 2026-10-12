@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { supabase } from '../data/supabase';
 import { Button } from '../ui/components';
@@ -31,7 +31,8 @@ export default function SignIn() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
-      <Text style={s.logo}>PacePath</Text>
+      <Image source={require('../../assets/icon.png')} style={s.mark} accessibilityIgnoresInvertColors />
+      <Text style={s.logo}>loopd</Text>
       <Text style={s.tag}>Run the city's best loops. Beat the record.</Text>
       <View style={{ height: space.xl }} />
       {!sent ? (
@@ -70,7 +71,8 @@ export default function SignIn() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, justifyContent: 'center', padding: space.xl, backgroundColor: colors.bg },
-  logo: { fontSize: 40, fontWeight: '900', color: colors.primary },
+  mark: { width: 84, height: 84, borderRadius: 20, marginBottom: space.lg },
+  logo: { fontSize: 44, fontWeight: '900', color: colors.text, letterSpacing: -1.5 },
   tag: { fontSize: 16, color: colors.muted, marginTop: space.xs },
   input: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

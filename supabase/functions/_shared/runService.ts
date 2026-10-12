@@ -3,10 +3,12 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 import { demProfilePath } from './core/elevation.ts';
+import { formatDuration } from './core/units.ts';
 import { simplify, type TrackPoint } from './core/geo.ts';
 import { findCourseAttempts } from './core/importMatch.ts';
 import { validateTrack } from './core/validation.ts';
 import { buildRoute, verifyAttempt } from './core/verify.ts';
+import { pushToUser } from './push.ts';
 
 export type Source = 'app' | 'apple_health' | 'strava' | 'gpx';
 
@@ -35,7 +37,7 @@ interface CourseRow {
  * phone tracked it and now the watch upload arrives). In that case a watch track replaces a
  * phone track — it's the more accurate one — and anything else is left alone.
  */
-async function recordAttempt(
+async function saveAttempt(
   admin: SupabaseClient,
   a: { userId: string; routeId: string; clientRunId: string; source: Source; elapsedS: number; finishedAt: number; pauseCount: number; track: TrackPoint[] },
 ): Promise<'inserted' | 'upgraded' | 'duplicate'> {
@@ -71,6 +73,55 @@ async function recordAttempt(
   );
   if (e) throw e;
   return 'inserted';
+}
+
+type AttemptInput = Parameters<typeof saveAttempt>[1];
+
+async function currentRecord(admin: SupabaseClient, routeId: string) {
+  const { data, error } = await admin
+    .from('attempts')
+    .select('user_id, elapsed_s')
+    .eq('route_id', routeId)
+    .order('elapsed_s')
+    .order('finished_at')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as { user_id: string; elapsed_s: number } | null;
+}
+
+/** Saves the attempt, and tells the previous record holder if it took their course record. */
+async function recordAttempt(admin: SupabaseClient, a: AttemptInput) {
+  const before = await currentRecord(admin, a.routeId);
+  const status = await saveAttempt(admin, a);
+  if (status !== 'duplicate' && before && before.user_id !== a.userId && a.elapsedS < Number(before.elapsed_s)) {
+    try {
+      await notifyRecordBeaten(admin, { routeId: a.routeId, previousHolder: before.user_id, oldS: Number(before.elapsed_s), newS: a.elapsedS, byUserId: a.userId });
+    } catch (e) {
+      // The new record stands either way; a failed notification must not fail the upload.
+      console.warn('record notification failed', (e as Error).message);
+    }
+  }
+  return status;
+}
+
+async function notifyRecordBeaten(
+  admin: SupabaseClient,
+  n: { routeId: string; previousHolder: string; oldS: number; newS: number; byUserId: string },
+) {
+  const [{ data: route }, { data: by }] = await Promise.all([
+    admin.from('routes').select('name').eq('id', n.routeId).single(),
+    admin.from('profiles').select('display_name').eq('id', n.byUserId).single(),
+  ]);
+  const routeName = route?.name ?? 'a course';
+  const byName = by?.display_name ?? 'Someone';
+  const data = { routeName, byName, newS: Math.round(n.newS), oldS: Math.round(n.oldS) };
+  await admin.from('notifications').insert({ user_id: n.previousHolder, kind: 'record_beaten', route_id: n.routeId, data });
+  await pushToUser(admin, n.previousHolder, {
+    title: `Your record on ${routeName} fell`,
+    body: `${byName} ran ${formatDuration(n.newS)}, beating your ${formatDuration(n.oldS)}. Go take it back.`,
+    data: { routeId: n.routeId, kind: 'record_beaten' },
+  });
 }
 
 async function visibleRoute(admin: SupabaseClient, userId: string, routeId: string): Promise<CourseRow | null> {
